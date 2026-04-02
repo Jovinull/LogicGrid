@@ -1,50 +1,65 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { GridRenderer } from '../services/GridRenderer';
 import { gameStateManager } from '../stores/GameStateManager';
+import { levels } from '../levels/levels';
 import CommandInput from './CommandInput';
 import GameControlButtons from './GameControlButtons';
 
 const gridRenderer = new GridRenderer();
 
+// Load Level 1 immediately so the singleton has the correct initial state
+const NIVEL = levels[0];
+gameStateManager.loadLevel(NIVEL);
+
 /**
  * Grid
  * React component that renders a square logic-grid using HTML5 Canvas.
+ * Loads Level 1 on mount, renders obstacles and a blinking goal, and displays
+ * a status message when the player wins or collides with an obstacle.
  *
  * Props:
- *   tamanhoDoGrid  {number} - Number of cells per side (default: 8)
- *   tamanhoDaCelula {number} - Pixel size of each cell before responsive scaling (default: 60)
+ *   tamanhoDaCelula {number} - Max pixel size of each cell before responsive scaling (default: 100)
  */
-function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
+function Grid({ tamanhoDaCelula = 100 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   // Mirror the hero state so React re-renders when it changes
-  const [heroi, setHeroi] = useState(() => gameStateManager.heroi);
+  const [heroi, setHeroi] = useState(() => ({ ...gameStateManager.heroi }));
 
   // Holds the last successfully parsed actions, ready for execution
   const [pendingActions, setPendingActions] = useState([]);
 
+  // Toggles every 500 ms to produce the goal blink effect
+  const [blinkVisible, setBlinkVisible] = useState(true);
+
+  // 'success' | 'failure' | null
+  const [gameResult, setGameResult] = useState(null);
+
   // Subscribe to GameStateManager updates
   useEffect(() => {
     const unsubscribe = gameStateManager.subscribe((state) => {
-      // Spread to produce a new object reference and trigger re-render
       setHeroi({ ...state.heroi });
     });
     return unsubscribe;
   }, []);
 
+  // Blink interval — toggles goal visibility at 500 ms
+  useEffect(() => {
+    const id = setInterval(() => setBlinkVisible((v) => !v), 500);
+    return () => clearInterval(id);
+  }, []);
+
   /**
    * Computes the largest cell size that keeps the grid square and fits inside
-   * the current container while respecting the requested cell size as a
-   * maximum.  Returns the adjusted cell size.
+   * the current container while respecting tamanhoDaCelula as a maximum.
    */
   const calcCellSize = useCallback(() => {
     if (!containerRef.current) return tamanhoDaCelula;
     const { clientWidth, clientHeight } = containerRef.current;
     const available = Math.min(clientWidth, clientHeight);
-    // Never exceed the requested cell size; shrink to fit if needed
-    return Math.min(tamanhoDaCelula, Math.floor(available / tamanhoDoGrid));
-  }, [tamanhoDoGrid, tamanhoDaCelula]);
+    return Math.min(tamanhoDaCelula, Math.floor(available / NIVEL.gridSize));
+  }, [tamanhoDaCelula]);
 
   /** Resize the canvas element and repaint the grid. */
   const draw = useCallback(() => {
@@ -52,17 +67,16 @@ function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
     if (!canvas) return;
 
     const cellSize = calcCellSize();
-    const totalSize = tamanhoDoGrid * cellSize;
+    const totalSize = NIVEL.gridSize * cellSize;
 
-    // Keep the canvas bitmap in sync with the computed size
     canvas.width = totalSize;
     canvas.height = totalSize;
 
     const ctx = canvas.getContext('2d');
-    gridRenderer.renderGrid(ctx, tamanhoDoGrid, cellSize, heroi);
-  }, [tamanhoDoGrid, calcCellSize, heroi]);
+    gridRenderer.renderGrid(ctx, NIVEL.gridSize, cellSize, heroi, NIVEL, blinkVisible);
+  }, [calcCellSize, heroi, blinkVisible]);
 
-  // Redraw whenever hero state or layout changes
+  // Redraw whenever hero state, blink phase, or layout changes
   useEffect(() => {
     draw();
 
@@ -71,14 +85,31 @@ function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
     return () => window.removeEventListener('resize', handleResize);
   }, [draw]);
 
+  function handleExecute(actions) {
+    setGameResult(null);
+    setPendingActions(actions);
+  }
+
   return (
     <div style={styles.outer}>
       <div ref={containerRef} style={styles.container}>
         <canvas ref={canvasRef} style={styles.canvas} />
       </div>
       <div style={styles.sidebar}>
-        <CommandInput onExecute={setPendingActions} />
-        <GameControlButtons parsedActions={pendingActions} gridSize={tamanhoDoGrid} />
+        <div style={styles.levelBadge}>Fase {NIVEL.id}</div>
+        <CommandInput onExecute={handleExecute} />
+        <GameControlButtons
+          parsedActions={pendingActions}
+          nivel={NIVEL}
+          onSuccess={() => setGameResult('success')}
+          onFailure={() => setGameResult('failure')}
+        />
+        {gameResult === 'success' && (
+          <div style={styles.resultSuccess}>Fase Concluída!</div>
+        )}
+        {gameResult === 'failure' && (
+          <div style={styles.resultFailure}>Obstáculo! Herói resetado.</div>
+        )}
       </div>
     </div>
   );
@@ -104,12 +135,36 @@ const styles = {
   },
   canvas: {
     display: 'block',
-    // Aspect ratio is maintained via canvas.width/height set in draw()
   },
   sidebar: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    padding: '16px',
+  },
+  levelBadge: {
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#555',
+  },
+  resultSuccess: {
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    padding: '8px 12px',
+    backgroundColor: '#E8F5E9',
+    color: '#2E7D32',
+    border: '1px solid #A5D6A7',
+    borderRadius: '4px',
+  },
+  resultFailure: {
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    padding: '8px 12px',
+    backgroundColor: '#FFEBEE',
+    color: '#C62828',
+    border: '1px solid #EF9A9A',
+    borderRadius: '4px',
   },
 };
 
