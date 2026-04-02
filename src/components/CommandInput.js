@@ -10,9 +10,9 @@ const parser = new CommandParser();
  * Displays an inline error message if a SyntaxError is detected.
  *
  * Props:
- *   onSubmit {Function} - Called with the parsed action array when valid.
+ *   onExecute {Function} - Called with the parsed action array when valid.
  */
-function CommandInput({ onSubmit }) {
+function CommandInput({ onExecute }) {
   const [text, setText] = useState('');
   const [error, setError] = useState(null);
 
@@ -20,7 +20,7 @@ function CommandInput({ onSubmit }) {
     setError(null);
     try {
       const actions = parser.parseCommands(text);
-      onSubmit(actions);
+      onExecute(actions);
     } catch (err) {
       setError(err.message);
     }
