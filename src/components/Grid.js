@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { GridRenderer } from '../services/GridRenderer';
 import { gameStateManager } from '../stores/GameStateManager';
+import CommandInput from './CommandInput';
 
 const gridRenderer = new GridRenderer();
 
@@ -12,6 +13,29 @@ const gridRenderer = new GridRenderer();
  *   tamanhoDoGrid  {number} - Number of cells per side (default: 8)
  *   tamanhoDaCelula {number} - Pixel size of each cell before responsive scaling (default: 60)
  */
+// Direction helpers for action execution
+const TURN_RIGHT = { Norte: 'Leste', Leste: 'Sul', Sul: 'Oeste', Oeste: 'Norte' };
+const TURN_LEFT  = { Norte: 'Oeste', Oeste: 'Sul', Sul: 'Leste', Leste: 'Norte' };
+
+function executeActions(actions, gridSize) {
+  let { x, y, direcao } = gameStateManager.heroi;
+
+  for (const { action } of actions) {
+    if (action === 'andar') {
+      if (direcao === 'Leste')  x = Math.min(x + 1, gridSize - 1);
+      if (direcao === 'Oeste')  x = Math.max(x - 1, 0);
+      if (direcao === 'Sul')    y = Math.min(y + 1, gridSize - 1);
+      if (direcao === 'Norte')  y = Math.max(y - 1, 0);
+    } else if (action === 'virarDireita') {
+      direcao = TURN_RIGHT[direcao];
+    } else if (action === 'virarEsquerda') {
+      direcao = TURN_LEFT[direcao];
+    }
+  }
+
+  gameStateManager.moverHeroi({ x, y, direcao });
+}
+
 function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
@@ -67,18 +91,29 @@ function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
   }, [draw]);
 
   return (
-    <div ref={containerRef} style={styles.container}>
-      <canvas ref={canvasRef} style={styles.canvas} />
+    <div style={styles.outer}>
+      <div ref={containerRef} style={styles.container}>
+        <canvas ref={canvasRef} style={styles.canvas} />
+      </div>
+      <CommandInput onSubmit={(actions) => executeActions(actions, tamanhoDoGrid)} />
     </div>
   );
 }
 
 const styles = {
+  outer: {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    width: '100%',
+    minHeight: '100vh',
+    boxSizing: 'border-box',
+  },
   container: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
+    flex: '1 1 auto',
     height: '100%',
     minHeight: '100vh',
     boxSizing: 'border-box',
