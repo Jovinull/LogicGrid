@@ -1,5 +1,6 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { GridRenderer } from '../services/GridRenderer';
+import { gameStateManager } from '../stores/GameStateManager';
 
 const gridRenderer = new GridRenderer();
 
@@ -14,6 +15,18 @@ const gridRenderer = new GridRenderer();
 function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+
+  // Mirror the hero state so React re-renders when it changes
+  const [heroi, setHeroi] = useState(() => gameStateManager.heroi);
+
+  // Subscribe to GameStateManager updates
+  useEffect(() => {
+    const unsubscribe = gameStateManager.subscribe((state) => {
+      // Spread to produce a new object reference and trigger re-render
+      setHeroi({ ...state.heroi });
+    });
+    return unsubscribe;
+  }, []);
 
   /**
    * Computes the largest cell size that keeps the grid square and fits inside
@@ -41,10 +54,10 @@ function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
     canvas.height = totalSize;
 
     const ctx = canvas.getContext('2d');
-    gridRenderer.renderGrid(ctx, tamanhoDoGrid, cellSize);
-  }, [tamanhoDoGrid, calcCellSize]);
+    gridRenderer.renderGrid(ctx, tamanhoDoGrid, cellSize, heroi);
+  }, [tamanhoDoGrid, calcCellSize, heroi]);
 
-  // Initial draw and resize listener
+  // Redraw whenever hero state or layout changes
   useEffect(() => {
     draw();
 
