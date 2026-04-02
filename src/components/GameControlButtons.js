@@ -10,12 +10,14 @@ const executionQueue = new ExecutionQueue();
  *
  * Props:
  *   parsedActions {Array<{action: string}>} - Actions returned by CommandParser.
- *   gridSize      {number}                  - Grid side length, used for boundary checks.
+ *   nivel         {object}                  - Loaded level data (gridSize, goal, obstacles).
+ *   onSuccess     {Function}                - Called when the hero reaches the goal.
+ *   onFailure     {Function}                - Called when the hero hits an obstacle.
  */
-function GameControlButtons({ parsedActions, gridSize }) {
+function GameControlButtons({ parsedActions, nivel, onSuccess, onFailure }) {
   function handleExecute() {
-    if (!parsedActions || parsedActions.length === 0) return;
-    executionQueue.startTickLoop(parsedActions, gridSize);
+    if (!parsedActions || parsedActions.length === 0 || !nivel) return;
+    executionQueue.startTickLoop(parsedActions, nivel, 500, onSuccess, onFailure);
   }
 
   return (
