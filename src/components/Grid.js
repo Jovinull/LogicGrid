@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { GridRenderer } from '../services/GridRenderer';
 import { gameStateManager } from '../stores/GameStateManager';
 import CommandInput from './CommandInput';
+import GameControlButtons from './GameControlButtons';
 
 const gridRenderer = new GridRenderer();
 
@@ -13,35 +14,15 @@ const gridRenderer = new GridRenderer();
  *   tamanhoDoGrid  {number} - Number of cells per side (default: 8)
  *   tamanhoDaCelula {number} - Pixel size of each cell before responsive scaling (default: 60)
  */
-// Direction helpers for action execution
-const TURN_RIGHT = { Norte: 'Leste', Leste: 'Sul', Sul: 'Oeste', Oeste: 'Norte' };
-const TURN_LEFT  = { Norte: 'Oeste', Oeste: 'Sul', Sul: 'Leste', Leste: 'Norte' };
-
-function executeActions(actions, gridSize) {
-  let { x, y, direcao } = gameStateManager.heroi;
-
-  for (const { action } of actions) {
-    if (action === 'andar') {
-      if (direcao === 'Leste')  x = Math.min(x + 1, gridSize - 1);
-      if (direcao === 'Oeste')  x = Math.max(x - 1, 0);
-      if (direcao === 'Sul')    y = Math.min(y + 1, gridSize - 1);
-      if (direcao === 'Norte')  y = Math.max(y - 1, 0);
-    } else if (action === 'virarDireita') {
-      direcao = TURN_RIGHT[direcao];
-    } else if (action === 'virarEsquerda') {
-      direcao = TURN_LEFT[direcao];
-    }
-  }
-
-  gameStateManager.moverHeroi({ x, y, direcao });
-}
-
 function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
   // Mirror the hero state so React re-renders when it changes
   const [heroi, setHeroi] = useState(() => gameStateManager.heroi);
+
+  // Holds the last successfully parsed actions, ready for execution
+  const [pendingActions, setPendingActions] = useState([]);
 
   // Subscribe to GameStateManager updates
   useEffect(() => {
@@ -95,7 +76,10 @@ function Grid({ tamanhoDoGrid = 8, tamanhoDaCelula = 60 }) {
       <div ref={containerRef} style={styles.container}>
         <canvas ref={canvasRef} style={styles.canvas} />
       </div>
-      <CommandInput onSubmit={(actions) => executeActions(actions, tamanhoDoGrid)} />
+      <div style={styles.sidebar}>
+        <CommandInput onExecute={setPendingActions} />
+        <GameControlButtons parsedActions={pendingActions} gridSize={tamanhoDoGrid} />
+      </div>
     </div>
   );
 }
@@ -121,6 +105,11 @@ const styles = {
   canvas: {
     display: 'block',
     // Aspect ratio is maintained via canvas.width/height set in draw()
+  },
+  sidebar: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
   },
 };
 
