@@ -36,7 +36,7 @@ function CommandInput({ onExecute }) {
         style={styles.textarea}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={'andar()\nvirarDireita()\nandar()'}
+        placeholder={'repetir(4) {\n  andar()\n  virarDireita()\n}'}
         rows={10}
         spellCheck={false}
       />

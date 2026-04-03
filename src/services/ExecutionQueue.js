@@ -8,8 +8,32 @@ const TURN_LEFT  = { Norte: 'Oeste', Oeste: 'Sul', Sul: 'Leste', Leste: 'Norte' 
  * Executes an array of parsed actions one at a time, with a fixed delay between
  * each step, updating GameStateManager after every action so the canvas redraws
  * incrementally (tick-based animation).
+ *
+ * Supports repetir(n) { ... } blocks by flattening them into a linear action
+ * list before execution begins, so the tick loop stays simple and non-blocking.
  */
 export class ExecutionQueue {
+  /**
+   * Recursively flatten a (possibly nested) action tree into a plain array of
+   * simple actions. repetir nodes are expanded inline.
+   *
+   * @param {Array} actions - Output of CommandParser.parseCommands().
+   * @returns {Array<{action: string}>} Flat list of simple action objects.
+   */
+  flattenActions(actions) {
+    const flat = [];
+    for (const item of actions) {
+      if (item.action === 'repetir') {
+        for (let i = 0; i < item.count; i++) {
+          flat.push(...this.flattenActions(item.commands));
+        }
+      } else {
+        flat.push(item);
+      }
+    }
+    return flat;
+  }
+
   /**
    * Start the tick loop for the given action list.
    * Reads the hero's current state from GameStateManager before each step so
@@ -20,20 +44,23 @@ export class ExecutionQueue {
    * After the final action, checks if the hero reached the goal and calls the
    * appropriate callback.
    *
-   * @param {Array<{action: string}>} actions  - Parsed action array from CommandParser.
-   * @param {object}                  nivel    - Loaded level data (gridSize, goal, obstacles).
-   * @param {number}                  [tickMs=500] - Milliseconds between ticks.
-   * @param {Function}                [onSuccess]  - Called when the hero reaches the goal.
-   * @param {Function}                [onFailure]  - Called when the hero collides with an obstacle.
+   * @param {Array}    actions      - Parsed action array from CommandParser (may contain repetir nodes).
+   * @param {object}   nivel        - Loaded level data (gridSize, goal, obstacles).
+   * @param {number}   [tickMs=500] - Milliseconds between ticks.
+   * @param {Function} [onSuccess]  - Called when the hero reaches the goal.
+   * @param {Function} [onFailure]  - Called when the hero collides with an obstacle.
    */
   startTickLoop(actions, nivel, tickMs = 500, onSuccess, onFailure) {
     const { gridSize, goal, obstacles } = nivel;
+
+    // Expand repetir blocks into a flat sequence before the tick loop starts
+    const flatActions = this.flattenActions(actions);
 
     // Build a fast lookup set: "x,y" strings for O(1) collision tests
     const obstacleSet = new Set(obstacles.map((o) => `${o.x},${o.y}`));
 
     const step = (index) => {
-      if (index >= actions.length) {
+      if (index >= flatActions.length) {
         // All actions consumed — check win condition
         const { x, y } = gameStateManager.heroi;
         if (x === goal.x && y === goal.y) {
@@ -43,7 +70,7 @@ export class ExecutionQueue {
       }
 
       const { x, y, direcao } = gameStateManager.heroi;
-      const { action } = actions[index];
+      const { action } = flatActions[index];
 
       let newX = x;
       let newY = y;
