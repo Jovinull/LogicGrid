@@ -6,7 +6,7 @@ export default defineConfig({
     watch: false,
     globals: true,
     environment: 'node',
-    include: ['src/**/*.{test,spec}.{js,mjs,ts,jsx,tsx}'],
+    include: ['apps/logic-grid-web/src/**/*.{test,spec}.{js,mjs,ts,jsx,tsx}'],
     reporters: ['default'],
     passWithNoTests: true,
   },
