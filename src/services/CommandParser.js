@@ -6,6 +6,9 @@
  * Supported structures: repetir(n) { ... }  (nestable)
  * Whitespace, blank lines, and semicolons are handled gracefully.
  * Throws a SyntaxError on the first unrecognised command or malformed block.
+ *
+ * Subclasses may extend _tryParseCustomToken() to add support for additional
+ * block-level constructs (e.g. se/senao conditional commands).
  */
 
 const VALID_COMMANDS = new Set(['andar', 'virarDireita', 'virarEsquerda']);
@@ -73,7 +76,7 @@ export class CommandParser {
 
       if (token === '{') {
         throw new SyntaxError(
-          `Erro de sintaxe: "{" inesperado sem comando "repetir"`
+          `Erro de sintaxe: "{" inesperado sem comando de bloco`
         );
       }
 
@@ -108,6 +111,15 @@ export class CommandParser {
         continue;
       }
 
+      // Hook: give subclasses the opportunity to parse custom block constructs
+      // (e.g. se/senao).  Returns {command, newIndex} or null.
+      const customResult = this._tryParseCustomToken(tokens, i);
+      if (customResult !== null) {
+        if (customResult.command != null) commands.push(customResult.command);
+        i = customResult.newIndex;
+        continue;
+      }
+
       // Simple command
       const cmdMatch = COMMAND_RE.exec(token);
       if (!cmdMatch) {
@@ -134,5 +146,21 @@ export class CommandParser {
     }
 
     return { commands, consumed: i - start };
+  }
+
+  /**
+   * Extension hook called by _parseBlock for any token that does not match
+   * a brace, repetir, or simple command.
+   *
+   * Subclasses override this to handle custom constructs (e.g. se/senao).
+   * The base implementation always returns null, causing the caller to fall
+   * through to the "unknown token" SyntaxError.
+   *
+   * @param {string[]} tokens - Full token array.
+   * @param {number}   i      - Index of the current token.
+   * @returns {{ command: object|null, newIndex: number } | null}
+   */
+  _tryParseCustomToken(_tokens, _i) {
+    return null;
   }
 }
