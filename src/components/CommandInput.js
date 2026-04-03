@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { CommandParser } from '../services/CommandParser';
+import { ConditionalCommandParser } from '../services/ConditionalCommandParser';
 
-const parser = new CommandParser();
+const parser = new ConditionalCommandParser();
 
 /**
  * CommandInput
@@ -36,7 +36,7 @@ function CommandInput({ onExecute }) {
         style={styles.textarea}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder={'repetir(4) {\n  andar()\n  virarDireita()\n}'}
+        placeholder={'se (caminhoLivre()) {\n  andar()\n} senao {\n  virarDireita()\n}'}
         rows={10}
         spellCheck={false}
       />
