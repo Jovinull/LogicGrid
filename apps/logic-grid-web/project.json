@@ -1,0 +1,9 @@
+{
+  "name": "logic-grid-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/logic-grid-web",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project logic-grid-web --web",
+  "targets": {}
+}

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { ConditionalCommandParser } from '../services/ConditionalCommandParser';
 
@@ -12,15 +14,20 @@ const parser = new ConditionalCommandParser();
  * Props:
  *   onExecute {Function} - Called with the parsed action array when valid.
  */
-function CommandInput({ onExecute }) {
-  const [text, setText] = useState('');
+function CommandInput({ onExecute, code = '' }) {
+  const [text, setText] = useState(code);
   const [error, setError] = useState(null);
+
+  // Update text when code prop changes (reloading from history)
+  React.useEffect(() => {
+    setText(code);
+  }, [code]);
 
   function handleSubmit() {
     setError(null);
     try {
       const actions = parser.parseCommands(text);
-      onExecute(actions);
+      onExecute(actions, text);
     } catch (err) {
       setError(err.message);
     }

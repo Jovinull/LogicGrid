@@ -1,9 +1,13 @@
+'use client';
+
 import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { GridRenderer } from '../services/GridRenderer';
 import { gameStateManager } from '../stores/GameStateManager';
 import { levels } from '../levels/levels';
 import CommandInput from './CommandInput';
 import GameControlButtons from './GameControlButtons';
+import SolutionHistory from './SolutionHistory';
+import { saveSolution } from '../app/actions';
 
 const gridRenderer = new GridRenderer();
 
@@ -14,29 +18,18 @@ gameStateManager.loadLevel(NIVEL);
 /**
  * Grid
  * React component that renders a square logic-grid using HTML5 Canvas.
- * Loads Level 1 on mount, renders obstacles and a blinking goal, and displays
- * a status message when the player wins or collides with an obstacle.
- *
- * Props:
- *   tamanhoDaCelula {number} - Max pixel size of each cell before responsive scaling (default: 100)
  */
 function Grid({ tamanhoDaCelula = 100 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
 
-  // Mirror the hero state so React re-renders when it changes
   const [heroi, setHeroi] = useState(() => ({ ...gameStateManager.heroi }));
-
-  // Holds the last successfully parsed actions, ready for execution
   const [pendingActions, setPendingActions] = useState([]);
-
-  // Toggles every 500 ms to produce the goal blink effect
+  const [lastExecutedCode, setLastExecutedCode] = useState('');
   const [blinkVisible, setBlinkVisible] = useState(true);
-
-  // 'success' | 'failure' | null
   const [gameResult, setGameResult] = useState(null);
+  const [refreshHistory, setRefreshHistory] = useState(0);
 
-  // Subscribe to GameStateManager updates
   useEffect(() => {
     const unsubscribe = gameStateManager.subscribe((state) => {
       setHeroi({ ...state.heroi });
@@ -44,16 +37,11 @@ function Grid({ tamanhoDaCelula = 100 }) {
     return unsubscribe;
   }, []);
 
-  // Blink interval — toggles goal visibility at 500 ms
   useEffect(() => {
     const id = setInterval(() => setBlinkVisible((v) => !v), 500);
     return () => clearInterval(id);
   }, []);
 
-  /**
-   * Computes the largest cell size that keeps the grid square and fits inside
-   * the current container while respecting tamanhoDaCelula as a maximum.
-   */
   const calcCellSize = useCallback(() => {
     if (!containerRef.current) return tamanhoDaCelula;
     const { clientWidth, clientHeight } = containerRef.current;
@@ -61,7 +49,6 @@ function Grid({ tamanhoDaCelula = 100 }) {
     return Math.min(tamanhoDaCelula, Math.floor(available / NIVEL.gridSize));
   }, [tamanhoDaCelula]);
 
-  /** Resize the canvas element and repaint the grid. */
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -76,18 +63,25 @@ function Grid({ tamanhoDaCelula = 100 }) {
     gridRenderer.renderGrid(ctx, NIVEL.gridSize, cellSize, heroi, NIVEL, blinkVisible);
   }, [calcCellSize, heroi, blinkVisible]);
 
-  // Redraw whenever hero state, blink phase, or layout changes
   useEffect(() => {
     draw();
-
     const handleResize = () => draw();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [draw]);
 
-  function handleExecute(actions) {
+  function handleExecute(actions, code) {
     setGameResult(null);
     setPendingActions(actions);
+    setLastExecutedCode(code);
+  }
+
+  async function handleSuccess() {
+    setGameResult('success');
+    if (lastExecutedCode) {
+      await saveSolution(NIVEL.id, 'Herói', lastExecutedCode);
+      setRefreshHistory(prev => prev + 1);
+    }
   }
 
   return (
@@ -97,20 +91,25 @@ function Grid({ tamanhoDaCelula = 100 }) {
       </div>
       <div style={styles.sidebar}>
         <div style={styles.levelBadge}>Fase {NIVEL.id}</div>
-        <CommandInput onExecute={handleExecute} />
+        <CommandInput onExecute={handleExecute} code={lastExecutedCode} />
         <GameControlButtons
           parsedActions={pendingActions}
           nivel={NIVEL}
-          onSuccess={() => setGameResult('success')}
+          onSuccess={handleSuccess}
           onFailure={() => setGameResult('failure')}
         />
         {gameResult === 'success' && (
-          <div style={styles.resultSuccess}>Fase Concluída!</div>
+          <div style={styles.resultSuccess}>Fase Concluída! Solução salva.</div>
         )}
         {gameResult === 'failure' && (
           <div style={styles.resultFailure}>Obstáculo! Herói resetado.</div>
         )}
       </div>
+      <SolutionHistory 
+        levelId={NIVEL.id} 
+        onSelect={(code) => setLastExecutedCode(code)} 
+        refreshTrigger={refreshHistory}
+      />
     </div>
   );
 }
